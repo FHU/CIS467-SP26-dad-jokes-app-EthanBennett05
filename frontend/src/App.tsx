@@ -29,7 +29,9 @@ export default function App() {
   const [view, setView] = useState<"random" | "browse" | "add">("random");
   const [loading, setLoading] = useState(false);
   const [healthy, setHealthy] = useState<boolean | null>(null);
-
+  const [email, setEmail] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false)
   // --- New joke form state ---
   const [newSetup, setNewSetup] = useState("");
   const [newPunchline, setNewPunchline] = useState("");
@@ -116,16 +118,40 @@ export default function App() {
       .catch(console.error);
   };
 
+  // --- Send a joke ---
+  const sendJoke = async () => {
+  try {
+    setSending(true);
+    setSent(false);
+
+    const res = await fetch("/api/jokes/email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        jokeId: joke?.id,
+      }),
+    });
+
+    if (res.ok) {
+      setSent(true);
+
+      // optional: auto-hide after 3 seconds
+      setTimeout(() => setSent(false), 3000);
+    }
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setSending(false);
+  }
+};
+
   return (
     <div style={styles.page}>
       {/* Header */}
       <header style={styles.header}>
-        <h1 style={styles.title}>
-          🧔 Dad Jokes Central 🧔
-        </h1>
-        <p style={styles.subtitle}>
-          Where every joke is a groan-er
-        </p>
+        <h1 style={styles.title}>🧔 Dad Jokes Central 🧔</h1>
+        <p style={styles.subtitle}>Where every joke is a groan-er</p>
         <div style={styles.statusDot}>
           <span
             style={{
@@ -135,7 +161,8 @@ export default function App() {
             }}
           />
           <span style={{ fontSize: "0.75rem", color: "#aaa" }}>
-            API {healthy === null ? "checking…" : healthy ? "connected" : "offline"}
+            API{" "}
+            {healthy === null ? "checking…" : healthy ? "connected" : "offline"}
           </span>
         </div>
       </header>
@@ -151,7 +178,11 @@ export default function App() {
               ...(view === v ? styles.navBtnActive : {}),
             }}
           >
-            {v === "random" ? "🎲 Random" : v === "browse" ? "📖 Browse" : "✏️ Add"}
+            {v === "random"
+              ? "🎲 Random"
+              : v === "browse"
+                ? "📖 Browse"
+                : "✏️ Add"}
           </button>
         ))}
       </nav>
@@ -205,8 +236,36 @@ export default function App() {
               onClick={fetchRandom}
               disabled={loading}
             >
-              {loading ? "Loading…" : joke ? "Another One! 🔄" : "Get a Joke 🎲"}
+              {loading
+                ? "Loading…"
+                : joke
+                  ? "Another One! 🔄"
+                  : "Get a Joke 🎲"}
             </button>
+            {showPunchline && (
+              <div style={{ marginTop: "1rem" }}>
+                <input
+                  type="email"
+                  placeholder="Friend's email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  style={styles.input}
+                />
+                <button
+                  style={styles.primaryBtn}
+                  onClick={sendJoke}
+                  disabled={sending || !email}
+                >
+                  {sending ? "Sending..." : "Email this joke 📧"}
+                </button>
+
+                {sent && (
+  <div style={{ color: "green", marginTop: "10px" }}>
+    ✅ Sent!
+  </div>
+)}
+              </div>
+            )}
           </div>
         )}
 
@@ -241,7 +300,9 @@ export default function App() {
               </div>
             ))}
             {allJokes.length === 0 && (
-              <p style={{ color: "#aaa", textAlign: "center" }}>No jokes found.</p>
+              <p style={{ color: "#aaa", textAlign: "center" }}>
+                No jokes found.
+              </p>
             )}
           </div>
         )}
@@ -269,13 +330,20 @@ export default function App() {
               onChange={(e) => setNewCategory(e.target.value)}
               style={styles.select}
             >
-              {["general", "science", "food", "animals", "tech", "work", "nature", "sports"].map(
-                (c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                )
-              )}
+              {[
+                "general",
+                "science",
+                "food",
+                "animals",
+                "tech",
+                "work",
+                "nature",
+                "sports",
+              ].map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
             </select>
             <button style={styles.primaryBtn} onClick={handleSubmit}>
               Submit Joke 🚀
@@ -285,7 +353,9 @@ export default function App() {
       </main>
 
       <footer style={styles.footer}>
-        <p>Dad Jokes Central · Dockerized with ❤️ · Express + React + PostgreSQL</p>
+        <p>
+          Dad Jokes Central · Dockerized with ❤️ · Express + React + PostgreSQL
+        </p>
       </footer>
     </div>
   );

@@ -1,15 +1,29 @@
-import express, { Request, Response } from "express";
+import express, { Request, response, Response } from "express";
 import cors from "cors";
 import { Pool } from "pg";
+import nodemailer from "nodemailer";
+import fs from "fs";
 
 // ---------------------------------------------------------------------------
 // Database connection
 // ---------------------------------------------------------------------------
+
+function getSecret(path?: string) {
+  try {
+    return path ? fs.readFileSync(path, "utf8").trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 const pool = new Pool({
   host: process.env.DB_HOST || "localhost",
   port: Number(process.env.DB_PORT) || 5432,
   user: process.env.DB_USER || "dadjokes",
-  password: process.env.DB_PASSWORD || "dadjokes",
+  password:
+    getSecret(process.env.DB_PASSWORD_FILE) ||
+    process.env.DB_PASSWORD ||
+    "dadjokes",
   database: process.env.DB_NAME || "dadjokes",
 });
 
@@ -171,6 +185,62 @@ app.get("/api/categories", async (_req: Request, res: Response) => {
     res.status(500).json({ error: "Failed to fetch categories" });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Send Joke via email
+// ---------------------------------------------------------------------------
+
+const transporter = nodemailer.createTransport({
+  host:
+    getSecret(process.env.SMTP_HOST_FILE) ||
+    process.env.SMTP_HOST ||
+    "mailpit",
+  port: Number(process.env.SMTP_PORT) || 1025,
+  secure: false,
+});
+
+async function sendJokeEmail(to: string, joke: {setup: string, punchline: string}) {
+  return transporter.sendMail({
+    from: '"Dad Jokes 😂" <no-reply@dadjokes.test>',
+    to,
+    subject: "😂 A dad joke for you!",
+    html: `
+      <h2>You've been sent a dad joke 😂</h2>
+      <p><strong>${joke.setup}</strong></p>
+      <p>${joke.punchline}</p>
+      <hr/>
+      <small>Sent from your Dad Jokes app</small>
+    `,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Email Endpoint -- Post
+// ---------------------------------------------------------------------------
+
+app.post("/api/jokes/email", async(req: Request, res: Response) => {
+  try {
+    const {email, jokeId} = req.body;
+
+    if (!email || !jokeId) {
+      res.status(400).json({error: "email and jokeId are required"});
+      return;
+    }
+    const result = await pool.query("SELECT * FROM jokes WHERE id = $1", [jokeId]);
+  
+    if (result.rows.length === 0) {
+        res.status(404).json({ error: "Joke not found" });
+        return;
+      }
+    const joke = result.rows[0];
+
+    await sendJokeEmail(email, joke);
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Error sending Dad Joke:", err);
+    res.status(500).json({ error: "Failed to send email" });
+  }
+})
 
 // ---------------------------------------------------------------------------
 // Start server
