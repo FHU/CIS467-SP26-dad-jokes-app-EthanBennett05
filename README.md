@@ -136,3 +136,11 @@ npm run dev
 # Note: Vite proxies /api to http://api:3000 by default.
 # For local dev, change the proxy target in vite.config.ts to http://localhost:3000.
 ```
+
+
+# Added Server
+The service I added was Mailpit so that you can email the funny joke to your friend.
+The way it works is that you input your friends email to the frontend and the api recieves the email along with the joke id. The api fetches the joke id from the database and uses Mailpit to send it to the given email using SMTP.
+
+via ChatGPT: Mailpit for developement purposes acts as a fake server not actually delivering the email (simple mail transfer protocol)
+
